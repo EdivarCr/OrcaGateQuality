@@ -1,0 +1,57 @@
+{
+  "timestamp": "2026-11-21T17:21:09.959138",
+  "initial_violations": 4,
+  "final_violations": 0,
+  "files_approved": 4,
+  "files_processed": 4,
+  "baseline_metrics": {
+    "CBO": 13.0,
+    "WMC": 47.0,
+    "LCOM": 318.0,
+    "CyclomaticComplexity": 8.0
+  },
+  "final_metrics": {
+    "CBO": 13.0,
+    "WMC": 47.0,
+    "LCOM": 318.0,
+    "CyclomaticComplexity": 8.0
+  },
+  "records": [
+    {
+      "file": "C:\\Users\\ed\\git\\article-orca\\workspace\\LLMCodeSmellRefactor\\src\\main\\java\\org\\example\\studyregistry\\StudyObjective.java",
+      "target_smells": [
+        "ExcessiveParameterList"
+      ],
+      "approved": true,
+      "attempts": 4,
+      "last_feedback": "Falha nos testes Maven:\nFalha na execução do 'mvn test':\n[ERROR] /C:/Users/ed/git/article-orca/workspace/LLMCodeSmellRefactor/src/main/java/org/example/controllers/StudyRegistryController.java:[60,18] method handleSetObjective in class org.example.studyregistry.StudyObjective cannot be applied to given types;\n  required: org.example.studyregistry.StudyObjective.ObjectiveData\n  found:    int,int,int,int,int,int,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,double,boolean\n  reason: actual and formal argument lists differ in length\n[INFO] 1 error\n[INFO] -------------------------------------------------------------\n[INFO] ------------------------------------------------------------------------\n[INFO] BUILD FAILURE\n[INFO] ------------------------------------------------------------------------\n[INFO] Total time:  1.827 s\n[INFO] Finished at: 2026-11-21T17:16:15-03:00\n[INFO] ------------------------------------------------------------------------\n[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:compile (default-compile) on project CodeSmellToolTesting: Compilation failure\n[ERROR] /C:/Users/ed/git/article-orca/workspace/LLMCodeSmellRefactor/src/main/java/org/example/controllers/StudyRegistryController.java:[60,18] method handleSetObjective in class org.example.studyregistry.StudyObjective cannot be applied to given types;\n[ERROR]   required: org.example.studyregistry.StudyObjective.ObjectiveData\n[ERROR]   found:    int,int,int,int,int,int,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String,double,boolean\n[ERROR]   reason: actual and formal argument lists differ in length\n[ERROR] -> [Help 1]\n[ERROR] \n[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.\n[ERROR] Re-run Maven using the -X switch to enable full debug logging.\n[ERROR] \n[ERROR] For more information about the errors and possible solutions, please read the following articles:\n[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException\n"
+    },
+    {
+      "file": "C:\\Users\\ed\\git\\article-orca\\workspace\\LLMCodeSmellRefactor\\src\\main\\java\\org\\example\\studyregistry\\StudyTaskManager.java",
+      "target_smells": [
+        "ExcessiveParameterList"
+      ],
+      "approved": true,
+      "attempts": 2,
+      "last_feedback": "Revisor (3.8) rejeitou: O contrato público do método setUpWeek foi violado pela remoção da assinatura original com 11 parâmetros, quebrando a compatibilidade binária. Além disso, a substituição por varargs (String...) quebra a validação em tempo de compilação do número de argumentos e introduz inconsistência na regra de negócio: o construtor WeekPlanConfig(String...) aceita qualquer número de itens sem limitar aos 11 necessários, enquanto WeekPlanConfig(List<String>) exige ao menos 11 elementos e corta a lista via subList(0, 11)."
+    },
+    {
+      "file": "C:\\Users\\ed\\git\\article-orca\\workspace\\LLMCodeSmellRefactor\\src\\main\\java\\org\\example\\studyregistry\\Task.java",
+      "target_smells": [
+        "DataClass"
+      ],
+      "approved": true,
+      "attempts": 1,
+      "last_feedback": null
+    },
+    {
+      "file": "C:\\Users\\ed\\git\\article-orca\\workspace\\LLMCodeSmellRefactor\\src\\main\\java\\org\\example\\studysearch\\SearchLog.java",
+      "target_smells": [
+        "DataClass"
+      ],
+      "approved": true,
+      "attempts": 1,
+      "last_feedback": null
+    }
+  ]
+}

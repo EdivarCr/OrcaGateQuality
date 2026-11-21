@@ -1,0 +1,46 @@
+{
+  "smells": [
+    "DataClass",
+    "ExcessiveParameterList"
+  ],
+  "violations_detail": [
+    {
+      "file": "C:\\Users\\ed\\git\\article-orca\\workspace\\LLMCodeSmellRefactor\\src\\main\\java\\org\\example\\studyregistry\\StudyObjective.java",
+      "rule": "ExcessiveParameterList",
+      "description": "Avoid long parameter lists.",
+      "begin_line": 85,
+      "end_line": 85,
+      "priority": 3
+    },
+    {
+      "file": "C:\\Users\\ed\\git\\article-orca\\workspace\\LLMCodeSmellRefactor\\src\\main\\java\\org\\example\\studyregistry\\StudyTaskManager.java",
+      "rule": "ExcessiveParameterList",
+      "description": "Avoid long parameter lists.",
+      "begin_line": 30,
+      "end_line": 32,
+      "priority": 3
+    },
+    {
+      "file": "C:\\Users\\ed\\git\\article-orca\\workspace\\LLMCodeSmellRefactor\\src\\main\\java\\org\\example\\studyregistry\\Task.java",
+      "rule": "DataClass",
+      "description": "The class 'Task' is suspected to be a Data Class (WOC=0.000%, NOPA=0, NOAM=8, WMC=9)",
+      "begin_line": 5,
+      "end_line": 42,
+      "priority": 3
+    },
+    {
+      "file": "C:\\Users\\ed\\git\\article-orca\\workspace\\LLMCodeSmellRefactor\\src\\main\\java\\org\\example\\studysearch\\SearchLog.java",
+      "rule": "DataClass",
+      "description": "The class 'SearchLog' is suspected to be a Data Class (WOC=25.000%, NOPA=0, NOAM=8, WMC=12)",
+      "begin_line": 8,
+      "end_line": 61,
+      "priority": 3
+    }
+  ],
+  "metrics": {
+    "CBO": 13.0,
+    "WMC": 47.0,
+    "LCOM": 318.0,
+    "CyclomaticComplexity": 8.0
+  }
+}

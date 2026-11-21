@@ -1,0 +1,38 @@
+{
+  "all_classes": {
+    "CBO": {
+      "mean_before": 2.94,
+      "mean_after": 3.17
+    },
+    "WMC": {
+      "mean_before": 13.0,
+      "mean_after": 15.6
+    },
+    "LCOM": {
+      "mean_before": 30.91,
+      "mean_after": 36.0
+    },
+    "CyclomaticComplexity": {
+      "mean_before": 3.0,
+      "mean_after": 3.14
+    }
+  },
+  "refactored_only": {
+    "CBO": {
+      "mean_before": 2.5,
+      "mean_after": 3.0
+    },
+    "WMC": {
+      "mean_before": 15.06,
+      "mean_after": 20.75
+    },
+    "LCOM": {
+      "mean_before": 21.88,
+      "mean_after": 33.0
+    },
+    "CyclomaticComplexity": {
+      "mean_before": 3.62,
+      "mean_after": 3.94
+    }
+  }
+}

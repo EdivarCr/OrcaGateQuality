@@ -1,3 +1,4 @@
+import shutil  # garanta que esteja nos imports do topo
 import json
 import logging
 import re
@@ -5,7 +6,6 @@ import subprocess
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 import yaml
 
@@ -24,29 +24,43 @@ logger = logging.getLogger("ORCA")
 with open("orca.config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
-
 # ==============================================================================
-# 1. ADAPTADOR ANTIGRAVITY (Agentes Argon e 3.8)
+# 1. INVOCAÇÃO DOS AGENTES ANTIGRAVITY (Argon e 3.8)
 # ==============================================================================
 def extract_java_code(raw: str) -> str:
     match = re.search(r"```(?:java)?\s*(.*?)```", raw, re.DOTALL)
     return match.group(1).strip() if match else raw.strip()
 
+def extract_java_code(raw: str, expected_class: str | None = None) -> str:
+    blocks = re.findall(r"```(?:java)?\s*(.*?)```", raw, re.DOTALL)
+    candidates = [b.strip() for b in blocks] if blocks else [raw.strip()]
 
-def run_antigravity_agent(agent_role: str, prompt: str, working_dir: str) -> str:
-    """
-    Executa um agente configurado no orca.config.yaml (ex.: Argon ou 3.8) via Antigravity.
-    """
-    agent_cfg = config["agents"][agent_role]
-    model_name = agent_cfg["model"]  # Ex: "argon" ou "3.8"
-    cmd_template = agent_cfg.get(
-        "command",
-        ["antigravity", "run", "--model", "{model}", "--prompt", "{prompt}"],
+    for code in sorted(candidates, key=len, reverse=True):
+        has_package = "package " in code
+        has_type = any(kw in code for kw in ("class ", "interface ", "enum ", "record "))
+        has_expected = (expected_class in code) if expected_class else True
+        if has_package and has_type and has_expected:
+            return code
+
+    raise ValueError(
+        f"Resposta do agente não contém código Java válido para '{expected_class}'. "
+        f"Início da saída: {raw[:200]!r}"
     )
 
+def run_antigravity_agent(agent_key: str, prompt: str, working_dir: str) -> str:
+    agy_bin = shutil.which("agy")
+    if not agy_bin:
+        raise FileNotFoundError("Executável 'agy' não encontrado no PATH.")
+
+    agent_cfg = config["agents"][agent_key]
+    model = agent_cfg["model"].strip()
+
     cmd = [
-        part.format(model=model_name, prompt=prompt)
-        for part in cmd_template
+        agy_bin,
+        "--model", model,
+        "--output-format", "text",
+        "--disable-slash-commands",
+        f"--print={prompt}",
     ]
 
     res = subprocess.run(
@@ -59,57 +73,62 @@ def run_antigravity_agent(agent_role: str, prompt: str, working_dir: str) -> str
 
     if res.returncode != 0:
         err = res.stderr.strip() or res.stdout.strip()
-        raise RuntimeError(f"Erro no agente Antigravity ({model_name}): {err}")
+        raise RuntimeError(f"Erro no agente Antigravity ({model}): {err}")
 
     return res.stdout.strip()
 
 
-def invoke_refactor_agent(
+def invoke_refactorer(
     file_path: str,
     source_code: str,
     violations: list[dict],
+    metrics: dict[str, float],
     repo_root: str,
     feedback: str | None = None,
 ) -> str:
+    agent_cfg = config["agents"]["refactorer"]
+    system_prompt = agent_cfg["system_prompt"].strip()
+
     smells_desc = "\n".join(
         f"- {v['rule']} (Linhas {v['begin_line']}-{v['end_line']}): {v['description']}"
         for v in violations
     )
+    metrics_desc = ", ".join(f"{k}={v}" for k, v in metrics.items())
 
     prompt = (
-        f"Você é um engenheiro especialista em refatoração Java.\n"
-        f"Arquivo alvo: {Path(file_path).name}\n\n"
-        f"Code Smells detectados pelo PMD:\n{smells_desc}\n\n"
-        f"Regras obrigatórias:\n"
-        f"1. Elimine todos os code smells listados sem introduzir novos.\n"
-        f"2. Preserve 100% do comportamento funcional e compatibilidade com os testes JUnit.\n"
-        f"3. Retorne EXCLUSIVAMENTE o código-fonte completo do arquivo dentro de um bloco ```java.\n\n"
-        f"Código atual:\n```java\n{source_code}\n```"
+        f"{system_prompt}\n\n"
+        f"Arquivo alvo: {Path(file_path).name}\n"
+        f"Métricas atuais (CK): {metrics_desc}\n\n"
+        f"Diagnóstico do Code Smell (PMD):\n{smells_desc}\n\n"
+        f"Código-fonte atual:\n```java\n{source_code}\n```"
     )
 
     if feedback:
         prompt += (
             f"\n\nATENÇÃO — A tentativa anterior foi REJEITADA pelo Quality Gate:\n"
-            f"{feedback}\nCorrija o problema apontado mantendo a eliminação dos smells."
+            f"{feedback}\nAjuste a refatoração para corrigir todos os pontos acima."
         )
 
     raw_output = run_antigravity_agent("refactorer", prompt, repo_root)
     return extract_java_code(raw_output)
 
 
-def invoke_semantic_reviewer(
+def invoke_reviewer(
+    original_code: str,
+    refactored_code: str,
     diff_text: str,
     target_smells: list[str],
     repo_root: str,
 ) -> tuple[bool, str]:
+    agent_cfg = config["agents"]["reviewer"]
+    system_prompt = agent_cfg["system_prompt"].strip()
+
     prompt = (
-        f"Você é um revisor técnico de refatorações Java. Analise o git diff abaixo e verifique:\n"
-        f"1. Se a refatoração preserva a semântica original e as regras de negócio.\n"
-        f"2. Se não há supressões artificiais (@SuppressWarnings) ou remoção indevida de lógica.\n\n"
-        f"Smells alvo: {', '.join(target_smells)}\n\n"
+        f"{system_prompt}\n\n"
+        f"Smells alvo eliminados: {', '.join(target_smells)}\n\n"
         f"Git Diff:\n```diff\n{diff_text}\n```\n\n"
-        f"Responda APENAS em JSON válido: "
-        f'{{"approved": true/false, "feedback": "justificativa objetiva"}}'
+        f"Código Original:\n```java\n{original_code}\n```\n\n"
+        f"Código Refatorado:\n```java\n{refactored_code}\n```"
     )
 
     raw = run_antigravity_agent("reviewer", prompt, repo_root)
@@ -117,42 +136,46 @@ def invoke_semantic_reviewer(
 
     try:
         data = json.loads(cleaned)
-        return bool(data.get("approved", False)), str(data.get("feedback", ""))
+        return bool(data.get("approved", False)), str(data.get("reason", ""))
     except json.JSONDecodeError:
         return ('"approved": true' in cleaned.lower()), cleaned
 
 
 # ==============================================================================
-# 2. QUALITY GATE (Fiel ao orca.config.yaml + Maven + Revisor 3.8)
+# 2. QUALITY GATE (Alinhado a 'quality_gate' do orca.config.yaml)
 # ==============================================================================
 def evaluate_quality_gate(
     baseline: dict,
     current: dict,
     target_smells: list[str],
     repo_root: str,
+    original_code: str,
+    refactored_code: str,
     diff_text: str,
 ) -> tuple[bool, str]:
-    # Barreira 1: Testes unitários Maven
-    tests_ok, test_log = run_maven_tests(repo_root)
-    if not tests_ok:
-        return False, f"Falha nos testes Maven:\n{test_log}"
-
     gate_cfg = config["quality_gate"]
+
+    # 1. Testes unitários Maven
+    if gate_cfg.get("require_tests_pass", True):
+        tests_ok, test_log = run_maven_tests(repo_root)
+        if not tests_ok:
+            return False, f"Falha nos testes Maven:\n{test_log}"
+
     reasons = []
 
-    # Barreira 2.1: Eliminação dos smells alvo
+    # 2. Eliminação dos smells alvo
     if gate_cfg.get("require_smell_removal", True):
         persisting = [s for s in target_smells if s in current["smells"]]
         if persisting:
             reasons.append(f"Smell(s) persistente(s): {', '.join(persisting)}.")
 
-    # Barreira 2.2: Bloqueio de novos smells
+    # 3. Bloqueio de novos smells
     if not gate_cfg.get("allow_new_smells", False):
         new_smells = set(current["smells"]) - set(baseline["smells"])
         if new_smells:
             reasons.append(f"Novos smells introduzidos: {', '.join(new_smells)}.")
 
-    # Barreira 2.3: Métricas estruturais CK
+    # 4. Regras de métricas estruturais CK
     for metric, operator in gate_cfg.get("metrics_rules", {}).items():
         old_val = baseline["metrics"][metric]
         new_val = current["metrics"][metric]
@@ -165,13 +188,19 @@ def evaluate_quality_gate(
     if reasons:
         return False, " | ".join(reasons)
 
-    # Barreira 3: Auditoria Semântica (Agente 3.8)
+    # 5. Auditoria Semântica (Agente 3.8)
     if not diff_text.strip():
-        return False, "Nenhuma alteração detectada no arquivo (diff vazio)."
+        return False, "Nenhuma modificação foi realizada no arquivo (diff vazio)."
 
-    approved, review_msg = invoke_semantic_reviewer(diff_text, target_smells, repo_root)
+    approved, reason = invoke_reviewer(
+        original_code=original_code,
+        refactored_code=refactored_code,
+        diff_text=diff_text,
+        target_smells=target_smells,
+        repo_root=repo_root,
+    )
     if not approved:
-        return False, f"Revisor (3.8) rejeitou: {review_msg}"
+        return False, f"Revisor (3.8) rejeitou: {reason}"
 
     return True, "Aprovado em todos os critérios de qualidade."
 
@@ -206,13 +235,14 @@ def commit_file(repo_root: str, file_path: str, message: str) -> None:
 
 
 # ==============================================================================
-# 4. PIPELINE ORCA
+# 4. ORQUESTRADOR PRINCIPAL
 # ==============================================================================
 def main() -> None:
-    repo_cfg = config["repository"]
-    repo_root = repo_cfg["root"]
-    source_dir = repo_cfg["source_dir"]
-    max_iterations = config["orchestrator"].get("max_iterations", 3)
+    orch_cfg = config["orchestrator"]
+    repo_root = orch_cfg["target_repo"]
+    source_dir = orch_cfg["source_dir"]
+    max_iterations = orch_cfg.get("max_iterations", 2)
+    max_files = orch_cfg.get("max_files_per_run", 5)
 
     results_dir = Path("results")
     results_dir.mkdir(exist_ok=True)
@@ -230,10 +260,11 @@ def main() -> None:
     for v in repo_baseline["violations_detail"]:
         violations_by_file[v["file"]].append(v)
 
-    target_files = list(violations_by_file.keys())
+    all_affected = list(violations_by_file.keys())
+    target_files = all_affected[:max_files]
     logger.info(
         f"Baseline: {len(repo_baseline['violations_detail'])} violações em "
-        f"{len(target_files)} arquivos."
+        f"{len(all_affected)} arquivos. Lote atual: {len(target_files)} arquivo(s)."
     )
 
     records = []
@@ -257,10 +288,11 @@ def main() -> None:
             logger.info(f"  -> Iteração {attempt}/{max_iterations} (Agente Argon)...")
             Path(file_path).write_text(original_code, encoding="utf-8")
 
-            refactored_code = invoke_refactor_agent(
+            refactored_code = invoke_refactorer(
                 file_path=file_path,
                 source_code=original_code,
                 violations=file_violations,
+                metrics=file_baseline["metrics"],
                 repo_root=repo_root,
                 feedback=feedback,
             )
@@ -274,6 +306,8 @@ def main() -> None:
                 current=current_analysis,
                 target_smells=target_smells,
                 repo_root=repo_root,
+                original_code=original_code,
+                refactored_code=refactored_code,
                 diff_text=diff_text,
             )
 
@@ -307,7 +341,7 @@ def main() -> None:
         "initial_violations": len(repo_baseline["violations_detail"]),
         "final_violations": len(final_analysis["violations_detail"]),
         "files_approved": sum(1 for r in records if r["approved"]),
-        "files_total": len(target_files),
+        "files_processed": len(target_files),
         "baseline_metrics": repo_baseline["metrics"],
         "final_metrics": final_analysis["metrics"],
         "records": records,
@@ -317,8 +351,8 @@ def main() -> None:
         json.dump(report, f, indent=2, ensure_ascii=False)
 
     logger.info(
-        f"Concluído! Violações: {report['initial_violations']} -> {report['final_violations']} "
-        f"| Aprovados: {report['files_approved']}/{report['files_total']}"
+        f"Lote concluído! Violações totais no repo: {report['initial_violations']} -> "
+        f"{report['final_violations']} | Aprovados no lote: {report['files_approved']}/{report['files_processed']}"
     )
 
 

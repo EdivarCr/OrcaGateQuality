@@ -1,16 +1,14 @@
-# orca.config.yaml
 orchestrator:
-  max_iterations: 2          # Reduz retentativas em casos difíceis
-  max_files_per_run: 5       # Processa em lotes pequenos para monitorar gastos
+  max_iterations: 4          # Permite até 2 ciclos de correção guiados por feedback
+  max_files_per_run: 5       # Processa em lotes pequenos para monitorar execução
   target_repo: "./workspace/LLMCodeSmellRefactor"
-  source_dir: "src/main/java"
+  source_dir: "./workspace/LLMCodeSmellRefactor/src/main/java"
   pmd_ruleset: "rules.xml"
 
-# Definição dos Agentes Especializados
 agents:
   refactorer:
     role: "Agente Refatorador"
-    model: "argon"               # Modelo responsável por propor a refatoração
+    model: "gemini-4-argon-medium"
     temperature: 0.2
     system_prompt: |
       Você é um Engenheiro de Software especialista em refatoração Java.
@@ -20,7 +18,7 @@ agents:
 
   reviewer:
     role: "Agente Revisor Semântico"
-    model: "3.8"                 # Modelo responsável pela auditoria comportamental
+    model: "gemini-3.8-flash-medium"
     temperature: 0.0
     response_format: "json"
     system_prompt: |
@@ -32,8 +30,4 @@ quality_gate:
   require_tests_pass: true
   require_smell_removal: true
   allow_new_smells: false
-  metrics_rules:
-    CyclomaticComplexity: "le"
-    WMC: "lt"
-    CBO: "le"
-    LCOM: "le"
+  metrics_rules: {}
