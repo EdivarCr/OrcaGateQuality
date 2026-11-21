@@ -1,0 +1,38 @@
+# orca.config.yaml
+orchestrator:
+  max_iterations: 3
+  target_repo: "./workspace/LLMCodeSmellRefactor"
+  source_dir: "src/main/java"
+  pmd_ruleset: "rules.xml"
+
+# Definição dos Agentes Especializados
+agents:
+  refactorer:
+    role: "Agente Refatorador"
+    model: "argon"               # Modelo responsável por propor a refatoração
+    temperature: 0.2
+    system_prompt: |
+      Você é um Engenheiro de Software especialista em refatoração Java.
+      Receba a classe alvo, o diagnóstico do Code Smell e as métricas atuais.
+      Refatore o código para eliminar o smell mantendo 100% da assinatura pública
+      e do comportamento original. Retorne apenas o código Java completo.
+
+  reviewer:
+    role: "Agente Revisor Semântico"
+    model: "3.8"                 # Modelo responsável pela auditoria comportamental
+    temperature: 0.0
+    response_format: "json"
+    system_prompt: |
+      Você é um Auditor de Qualidade de Software. Compare o código original com o
+      refatorado. Verifique se regras de negócio, exceções e contratos públicos foram
+      preservados. Responda APENAS em JSON: {"approved": boolean, "reason": "string"}.
+
+quality_gate:
+  require_tests_pass: true
+  require_smell_removal: true
+  allow_new_smells: false
+  metrics_rules:
+    CyclomaticComplexity: "le"
+    WMC: "lt"
+    CBO: "le"
+    LCOM: "le"
