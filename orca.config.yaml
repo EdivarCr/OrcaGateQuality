@@ -1,6 +1,7 @@
 # orca.config.yaml
 orchestrator:
-  max_iterations: 3
+  max_iterations: 2          # Reduz retentativas em casos difíceis
+  max_files_per_run: 5       # Processa em lotes pequenos para monitorar gastos
   target_repo: "./workspace/LLMCodeSmellRefactor"
   source_dir: "src/main/java"
   pmd_ruleset: "rules.xml"

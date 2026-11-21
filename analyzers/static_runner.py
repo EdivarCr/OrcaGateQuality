@@ -6,10 +6,14 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-
-PMD_BIN = Path("./tools/pmd/bin/pmd").resolve()
+pmd_executable = "pmd.bat" if os.name == "nt" else "pmd"
+PMD_BIN = Path(f"./tools/pmd/bin/{pmd_executable}").resolve()
 CK_JAR = Path("./tools/ck.jar").resolve()
-PMD_RULESET = "category/java/design.xml"  # Contém GodClass, ExcessiveParameterList, CognitiveComplexity, etc.
+mvn_executable = "mvn.cmd" if os.name == "nt" else "mvn"
+MAVEN_BIN = Path(f"./tools/maven/bin/{mvn_executable}").resolve()
+
+if not PMD_BIN.exists():
+    raise FileNotFoundError(f"Binário do PMD não encontrado em: {PMD_BIN}")# Contém GodClass, ExcessiveParameterList, CognitiveComplexity, etc.
 
 
 def run_maven_tests(repo_root: str) -> tuple[bool, str]:
@@ -18,7 +22,7 @@ def run_maven_tests(repo_root: str) -> tuple[bool, str]:
     Retorna (passou: bool, log_erro: str).
     """
     result = subprocess.run(
-        ["mvn", "test", "-B"],
+        [str(MAVEN_BIN), "test", "-B"],
         cwd=str(Path(repo_root).resolve()),
         capture_output=True,
         text=True,
@@ -26,25 +30,24 @@ def run_maven_tests(repo_root: str) -> tuple[bool, str]:
     if result.returncode == 0:
         return True, "Todos os testes unitários passaram."
     
-    # Extrai as últimas linhas do log do Maven para alimentar o feedback do Agente A
-    error_tail = "\n".join(result.stdout.splitlines()[-25:])
+    error_tail = "\n".join((result.stdout + "\n" + result.stderr).splitlines()[-25:])
     return False, f"Falha na execução do 'mvn test':\n{error_tail}"
 
 def run_pmd(target_path: str, repo_root: str, output_json: str) -> list[dict]:
     ruleset_path = str((Path(repo_root) / "rules.xml").resolve())
     cmd = [
         str(PMD_BIN),
-        "check",
         "-d", str(Path(target_path).resolve()),
         "-R", ruleset_path,
         "-f", "json",
         "-r", output_json,
         "--no-cache",
     ]
-    
+
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode not in (0, 4):
-        raise RuntimeError(f"Erro ao executar PMD (code {result.returncode}): {result.stderr}")
+        error_msg = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(f"Erro ao executar PMD (code {result.returncode}): {error_msg}")
 
     if not os.path.exists(output_json):
         return []
@@ -136,7 +139,7 @@ def run_analysis(target_path: str, repo_root: str) -> dict[str, Any]:
         pmd_out = os.path.join(tmp_dir, "pmd.json")
         ck_prefix = os.path.join(tmp_dir, "ck_")
 
-        violations = run_pmd(target_path, pmd_out)
+        violations = run_pmd(target_path, repo_root, pmd_out)
         metrics = run_ck(ck_scan_dir, ck_prefix, target_file=filter_file)
 
     return {
